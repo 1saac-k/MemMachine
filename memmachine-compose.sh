@@ -1008,16 +1008,99 @@ build_image() {
     docker build --build-arg GPU=$gpu --build-arg SCM_VERSION="$scm_version" -t "$name" .
 }
 
+# Configure reranker settings
+configure_reranker() {
+    if [ "$is_first_run" != true ]; then
+        return
+    fi
+
+    if [ ! -f "configuration.yml" ]; then
+        return
+    fi
+
+    print_info "Configuring reranker..."
+    echo ""
+    echo "Available reranker options:"
+    echo "  1) Default (RRF hybrid: identity + BM25) - No external dependencies"
+    echo "  2) Cohere - Uses Cohere Rerank API (requires API key)"
+    echo "  3) Cross-encoder - Uses local cross-encoder model (GPU recommended)"
+    echo "  4) Skip - Keep the current reranker configuration as-is"
+    echo ""
+
+    print_prompt
+    read -p "Which reranker would you like to add? [1]: " reranker_choice
+    reranker_choice=${reranker_choice:-1}
+
+    case "$reranker_choice" in
+        1)
+            print_success "Using default RRF hybrid reranker (identity + BM25)"
+            ;;
+        2)
+            print_prompt
+            read -p "Would you like to set your Cohere API key? (y/N) " reply
+            if [[ $reply =~ ^[Yy]$ ]]; then
+                print_prompt
+                read -sp "Enter your Cohere API key: " cohere_key
+                echo
+                safe_sed_inplace "s|cohere_key: <COHERE_API_KEY>|cohere_key: $cohere_key|g" configuration.yml
+                print_success "Set Cohere API key in configuration.yml"
+            else
+                safe_sed_inplace "s|cohere_key: <COHERE_API_KEY>|cohere_key: EMPTY|g" configuration.yml
+                print_warning "Cohere API key set to 'EMPTY'. Update it later if needed."
+            fi
+
+            print_prompt
+            read -p "Cohere reranker model [rerank-english-v3.0]: " cohere_model
+            cohere_model=${cohere_model:-rerank-english-v3.0}
+            safe_sed_inplace "/cohere_reranker_id:/,/model:/ s|model: .*|model: \"$cohere_model\"|" configuration.yml
+
+            # Add cohere_reranker_id to the hybrid reranker list
+            if ! grep -q "cohere_reranker_id" <(awk '/my_reranker_id:/,/^    [a-zA-Z]/' configuration.yml); then
+                safe_sed_inplace "/reranker_ids:/,/^    [a-zA-Z]/ { /- bm_ranker_id/a\\          - cohere_reranker_id
+                }" configuration.yml
+            fi
+            print_success "Added Cohere reranker to hybrid configuration"
+            ;;
+        3)
+            # Add cross-encoder to the hybrid reranker list
+            if ! grep -q "ce_ranker_id" <(awk '/my_reranker_id:/,/^    [a-zA-Z]/' configuration.yml); then
+                safe_sed_inplace "/reranker_ids:/,/^    [a-zA-Z]/ { /- bm_ranker_id/a\\          - ce_ranker_id
+                }" configuration.yml
+            fi
+
+            # Ensure ce_ranker_id section exists in configuration
+            if ! grep -q "ce_ranker_id:" configuration.yml; then
+                # Append cross-encoder definition after bm_ranker_id section
+                safe_sed_inplace "/bm_ranker_id:/,/provider:/ { /provider: \"bm25\"/a\\    ce_ranker_id:\n      provider: \"cross-encoder\"\n      config:\n        model_name: \"cross-encoder/qnli-electra-base\"
+                }" configuration.yml
+            fi
+
+            print_prompt
+            read -p "Cross-encoder model [cross-encoder/qnli-electra-base]: " ce_model
+            ce_model=${ce_model:-cross-encoder/qnli-electra-base}
+            safe_sed_inplace "/ce_ranker_id:/,/model_name:/ s|model_name: .*|model_name: \"$ce_model\"|" configuration.yml
+            print_success "Added cross-encoder reranker to hybrid configuration"
+            ;;
+        4)
+            print_info "Keeping current reranker configuration"
+            ;;
+        *)
+            print_warning "Invalid selection. Keeping default reranker configuration."
+            ;;
+    esac
+}
+
 # Main execution
 main() {
     echo "MemMachine Docker Startup Script"
     echo "===================================="
     echo ""
-    
+
     find_docker_compose
     check_env_file
     check_config_file
     set_provider_api_keys
+    configure_reranker
     check_required_env
     check_required_config
     start_services
