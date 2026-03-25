@@ -85,6 +85,16 @@ escape_for_sed() {
     echo "$cleaned" | sed 's/&/\\&/g'
 }
 
+# Validate provider name and return normalized form
+validate_provider() {
+    local input="$1"
+    local normalized=$(echo "$input" | tr -d '\n\r' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+    case "$normalized" in
+        OPENAI|BEDROCK|OLLAMA|OPENAI_COMPATIBLE) echo "$normalized" ;;
+        *) echo "" ;;
+    esac
+}
+
 # Find docker compose available
 find_docker_compose() {
     if ! command -v docker &> /dev/null; then
@@ -200,50 +210,58 @@ select_embedding_model() {
     echo "$embedding_model"
 }
 
-# Generate configuration file with only the needed sections for the selected provider
+# Map provider name to model/embedder config names
+get_model_name_for_provider() {
+    case "$1" in
+        "OPENAI") echo "openai_model" ;;
+        "BEDROCK") echo "aws_model" ;;
+        "OLLAMA") echo "ollama_model" ;;
+        "OPENAI_COMPATIBLE") echo "openai_compatible_model" ;;
+    esac
+}
+
+get_embedder_name_for_provider() {
+    case "$1" in
+        "OPENAI") echo "openai_embedder" ;;
+        "BEDROCK") echo "aws_embedder_id" ;;
+        "OLLAMA") echo "ollama_embedder" ;;
+        "OPENAI_COMPATIBLE") echo "openai_compatible_embedder" ;;
+    esac
+}
+
+get_model_field_for_provider() {
+    case "$1" in
+        "BEDROCK") echo "model_id" ;;
+        *) echo "model" ;;
+    esac
+}
+
+# Generate configuration file with only the needed sections for the selected providers
 generate_config_for_provider() {
     local config_source="$1"
-    local provider="$2"
+    local llm_provider="$2"
     local llm_model="$3"
-    local embedding_model="$4"
+    local embedding_provider="$4"
+    local embedding_model="$5"
     local escaped_llm_model=$(escape_for_sed "$llm_model")
     local escaped_embedding_model=$(escape_for_sed "$embedding_model")
-    
-    print_info "Generating configuration file for $provider provider..."
-    
-    # Determine which model and embedder to use based on provider
-    case "$provider" in
-        "OPENAI")
-            local model_name="openai_model"
-            local embedder_name="openai_embedder"
-            local model_field="model"
-            local embedder_field="model"
-            ;;
-        "BEDROCK")
-            local model_name="aws_model"
-            local embedder_name="aws_embedder_id"
-            local model_field="model_id"
-            local embedder_field="model_id"
-            ;;
-        "OLLAMA")
-            local model_name="ollama_model"
-            local embedder_name="ollama_embedder"
-            local model_field="model"
-            local embedder_field="model"
-            ;;
-        "OPENAI_COMPATIBLE")
-            # OpenAI-compatible providers (e.g. self-hosted / compatible APIs)
-            # Uses sample config entries: openai_compatible_model / openai_compatible_embedder
-            local model_name="openai_compatible_model"
-            local embedder_name="openai_compatible_embedder"
-            local model_field="model"
-            local embedder_field="model"
-            ;;
-        *)
-            print_error "Unknown provider: $provider"
-            return 1
-            ;;
-    esac
+
+    print_info "Generating configuration file (LLM: $llm_provider, Embedding: $embedding_provider)..."
+
+    # Determine which model and embedder to use based on providers
+    local model_name=$(get_model_name_for_provider "$llm_provider")
+    local embedder_name=$(get_embedder_name_for_provider "$embedding_provider")
+    local model_field=$(get_model_field_for_provider "$llm_provider")
+    local embedder_field=$(get_model_field_for_provider "$embedding_provider")
+
+    if [ -z "$model_name" ]; then
+        print_error "Unknown LLM provider: $llm_provider"
+        return 1
+    fi
+    if [ -z "$embedder_name" ]; then
+        print_error "Unknown embedding provider: $embedding_provider"
+        return 1
+    fi
     
     # Use awk to extract and build the configuration file
     awk -v provider="$provider" \
@@ -430,7 +448,7 @@ generate_config_for_provider() {
     { print }
 AWK_SCRIPT
     
-    print_success "Generated configuration file with $provider provider settings"
+    print_success "Generated configuration file (LLM: $llm_provider, Embedding: $embedding_provider)"
 }
 
 # In lieu of yq, use awk to read over the configuration.yml file line-by-line,
@@ -499,20 +517,30 @@ check_config_file() {
             MEMMACHINE_IMAGE="memmachine/memmachine:latest-cpu"
         fi
 
-        # Ask user for provider path (OpenAI, Bedrock, Ollama or OpenAI-compatible)
+        # Ask user for LLM provider
         print_prompt
-        read -p "Which provider would you like to use? (OpenAI/Bedrock/Ollama/OpenAI-compatible) [OpenAI]: " provider_input
-        # Clean the input and set default
-        provider_input=$(echo "${provider_input:-OpenAI}" | tr -d '\n\r' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-        local provider="$provider_input"
-        
-        # Validate provider selection
-        if [[ "$provider" != "OPENAI" && "$provider" != "BEDROCK" && "$provider" != "OLLAMA" && "$provider" != "OPENAI_COMPATIBLE" ]]; then
-            print_warning "Invalid provider selection: '$provider'. Defaulting to OpenAI."
-            provider="OPENAI"
+        read -p "Which LLM provider would you like to use? (OpenAI/Bedrock/Ollama/OpenAI-compatible) [OpenAI]: " provider_input
+        local llm_provider=$(validate_provider "${provider_input:-OpenAI}")
+        if [ -z "$llm_provider" ]; then
+            print_warning "Invalid provider selection: '$provider_input'. Defaulting to OpenAI."
+            llm_provider="OPENAI"
         fi
-        
-        print_info "Selected provider: $provider"
+        print_info "Selected LLM provider: $llm_provider"
+
+        # Ask if user wants a different provider for embedding
+        local embedding_provider="$llm_provider"
+        print_prompt
+        read -p "Use a different provider for embedding? (y/N) " reply
+        if [[ $reply =~ ^[Yy]$ ]]; then
+            print_prompt
+            read -p "Which embedding provider would you like to use? (OpenAI/Bedrock/Ollama/OpenAI-compatible) [${llm_provider}]: " emb_provider_input
+            embedding_provider=$(validate_provider "${emb_provider_input:-$llm_provider}")
+            if [ -z "$embedding_provider" ]; then
+                print_warning "Invalid provider selection: '$emb_provider_input'. Using LLM provider ($llm_provider)."
+                embedding_provider="$llm_provider"
+            fi
+        fi
+        print_info "Selected embedding provider: $embedding_provider"
 
         # Update .env file with the selected image
         if [ -f ".env" ]; then
@@ -524,13 +552,13 @@ check_config_file() {
 
         if [ -f "$CONFIG_SOURCE" ]; then
             # LLM model selection
-            local selected_llm_model=$(select_llm_model "$provider")
-            
+            local selected_llm_model=$(select_llm_model "$llm_provider")
+
             # embedding model selection
-            local selected_embedding_model=$(select_embedding_model "$provider")
-            
-            # Generate configuration file with only needed sections for the selected provider
-            generate_config_for_provider "$CONFIG_SOURCE" "$provider" "$selected_llm_model" "$selected_embedding_model"
+            local selected_embedding_model=$(select_embedding_model "$embedding_provider")
+
+            # Generate configuration file with needed sections for the selected providers
+            generate_config_for_provider "$CONFIG_SOURCE" "$llm_provider" "$selected_llm_model" "$embedding_provider" "$selected_embedding_model"
         else
             print_error "$CONFIG_SOURCE file not found. Please create configuration.yml file manually."
             exit 1
@@ -1050,7 +1078,8 @@ case "${1:-}" in
         echo "Features:"
         echo "  ProfileMemory - Intelligent user profiling and memory management"
         echo "  Episodic Memory - Context-aware memory storage and retrieval"
-        echo "  Multi-provider support - Choose your preferred AI provider"
+        echo "  Multi-provider support - Choose your preferred AI provider per component"
+        echo "  Mixed providers - Use different providers for LLM and embedding"
         echo ""
         ;;
     "")
