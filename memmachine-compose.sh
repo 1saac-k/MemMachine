@@ -638,6 +638,11 @@ set_provider_api_keys() {
                     safe_sed_inplace "s|OPENAI_API_KEY=.*|OPENAI_API_KEY=$api_key|" .env
                     safe_sed_inplace "s|api_key: <YOUR_API_KEY>|api_key: $api_key|g" configuration.yml
                     print_success "Set OPENAI_API_KEY in .env and configuration.yml"
+                else
+                    # Auto-populate with EMPTY to prevent runtime errors
+                    safe_sed_inplace "s|OPENAI_API_KEY=.*|OPENAI_API_KEY=EMPTY|" .env
+                    safe_sed_inplace "s|api_key: <YOUR_API_KEY>|api_key: EMPTY|g" configuration.yml
+                    print_warning "API key set to 'EMPTY'. Update it later if your provider requires authentication."
                 fi
             else
                 print_success "OpenAI API key appears to be configured"
@@ -656,6 +661,11 @@ set_provider_api_keys() {
                     safe_sed_inplace "s|OPENAI_API_KEY=.*|OPENAI_API_KEY=$api_key|" .env
                     safe_sed_inplace "s|api_key: <YOUR_API_KEY>|api_key: $api_key|g" configuration.yml
                     print_success "Set OPENAI_API_KEY in .env and configuration.yml"
+                else
+                    # Auto-populate with EMPTY to prevent runtime errors (e.g. vLLM doesn't require API keys)
+                    safe_sed_inplace "s|OPENAI_API_KEY=.*|OPENAI_API_KEY=EMPTY|" .env
+                    safe_sed_inplace "s|api_key: <YOUR_API_KEY>|api_key: EMPTY|g" configuration.yml
+                    print_warning "API key set to 'EMPTY'. Update it later if your provider requires authentication."
                 fi
             else
                 print_success "API key for OpenAI-compatible provider appears to be configured"
@@ -686,6 +696,8 @@ set_provider_api_keys() {
                     safe_sed_inplace "s|aws_secret_access_key: <AWS_SECRET_ACCESS_KEY>|aws_secret_access_key: $aws_secret_key|g" configuration.yml
                     safe_sed_inplace "s|region: .*|region: \"$aws_region\"|g" configuration.yml
                     print_success "Set AWS credentials and configuration in configuration.yml"
+                else
+                    print_warning "AWS credentials left as placeholders. Update configuration.yml before running."
                 fi
             else
                 print_success "AWS credentials appear to be configured"
@@ -734,6 +746,8 @@ check_required_env() {
                 print_warning "Please set your OpenAI API key in the .env file"
                 print_prompt
                 read -p "Press Enter to continue anyway (some features may not work)..."
+            elif [ "$OPENAI_API_KEY" = "EMPTY" ]; then
+                print_info "OPENAI_API_KEY is set to 'EMPTY' (no authentication)"
             else
                 print_success "OPENAI_API_KEY is configured"
             fi
@@ -746,6 +760,8 @@ check_required_env() {
                 print_warning "Please set your API key in the .env file for the OpenAI-compatible provider"
                 print_prompt
                 read -p "Press Enter to continue anyway (some features may not work)..."
+            elif [ "$OPENAI_API_KEY" = "EMPTY" ]; then
+                print_info "OPENAI_API_KEY is set to 'EMPTY' (no authentication - OK for providers like vLLM)"
             else
                 print_success "OPENAI_API_KEY is configured (OpenAI-compatible provider)"
             fi
