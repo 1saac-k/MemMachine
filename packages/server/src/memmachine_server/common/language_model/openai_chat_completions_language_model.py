@@ -320,7 +320,7 @@ class OpenAIChatCompletionsLanguageModel(LanguageModel):
         self,
         response: ChatCompletion | AsyncIterator[object] | object,
         output_format: type[T],
-    ) -> T:
+    ) -> T | None:
         if not self._is_streaming_response(response):
             response = cast(ChatCompletion, response)
             self._collect_usage_metrics(response)
@@ -329,9 +329,13 @@ class OpenAIChatCompletionsLanguageModel(LanguageModel):
                 input_tools=[],
                 chat_completion=response,
             )
-            return TypeAdapter(output_format).validate_python(
-                parsed_response.choices[0].message.parsed
-            )
+            parsed = parsed_response.choices[0].message.parsed
+            if parsed is None:
+                logger.warning(
+                    "LLM returned None parsed response (model refusal or structured-output parse failure)"
+                )
+                return None
+            return TypeAdapter(output_format).validate_python(parsed)
 
         content, _, _, _ = await self._collect_streaming_response(cast(Any, response))
         return TypeAdapter(output_format).validate_python(json_repair.loads(content))
