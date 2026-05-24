@@ -70,7 +70,7 @@ class ResourceManager(Protocol):
 def _with_has_set_ids(
     set_ids: Sequence[SetIdT],
     filter_expr: FilterExpr | None,
-) -> FilterExpr:
+) -> FilterExpr | None:
     if len(set_ids) == 0:
         return filter_expr
 
@@ -341,6 +341,9 @@ class SemanticService:
     ) -> AsyncIterator[SemanticFeature]:
         logger.debug("Getting features for set ids %s", set_ids)
 
+        if not set_ids:
+            return
+
         async for feature in self._semantic_storage.get_feature_set(
             filter_expr=_with_has_set_ids(
                 set_ids=set_ids,
@@ -419,6 +422,9 @@ class SemanticService:
         filter_expr: FilterExpr | None = None,
     ) -> None:
         logger.debug("Deleting filter feature set ids %s", set_ids)
+
+        if not set_ids:
+            return
 
         await self._semantic_storage.delete_feature_set(
             filter_expr=_with_has_set_ids(
