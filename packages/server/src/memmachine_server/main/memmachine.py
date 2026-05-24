@@ -994,7 +994,7 @@ class MemMachine:
                 )
             )
 
-        if MemoryType.Semantic in target_memories:
+        if MemoryType.Semantic in target_memories and self._conf.semantic_memory.enabled:
             semantic_session = await self._resources.get_semantic_session_manager()
 
             async def _collect_semantic_results() -> list[SemanticFeature]:
@@ -1071,7 +1071,7 @@ class MemMachine:
                 )
             )
 
-        if MemoryType.Semantic in target_memories:
+        if MemoryType.Semantic in target_memories and self._conf.semantic_memory.enabled:
             semantic_session = await self._resources.get_semantic_session_manager()
 
             async def _collect_semantic_results() -> list[SemanticFeature]:
