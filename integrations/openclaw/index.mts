@@ -554,17 +554,24 @@ export default {
             DEFAULT_SEARCH_THRESHOLD;
 
           const handle = resolveMemoryHandle(api, { sessionKey: ctx.sessionKey });
-          const filter = buildScopeFilter(scope, ctx.sessionKey, handle.config.userId) ?? "";
+          // Use sessionId (matching the run_id stored by autoCaptureMessages) with
+          // buildAutoRecallFilter for "all" scope to avoid the dangerous OR with the
+          // shared default userId that would otherwise return every stored memory.
+          const sessionId = (ctx as { sessionId?: string }).sessionId ?? ctx.sessionKey;
+          const scopeFilter =
+            scope === "session"
+              ? buildScopeFilter("session", sessionId, handle.config.userId)
+              : buildAutoRecallFilter(sessionId, handle.config.userId);
 
           const result = await handle.memory.search(query, {
             top_k: limit,
             score_threshold: minScore,
-            filter,
+            ...(scopeFilter !== undefined ? { filter: scopeFilter } : {}),
           });
 
           return jsonResult({
             scope,
-            filter,
+            filter: scopeFilter ?? null,
             result,
           });
         },
