@@ -35,6 +35,16 @@ type MemoryHandle = {
 };
 
 const DEFAULT_TOP_K = 5;
+
+// Per-session set of content fingerprints already sent to MemMachine.
+// Prevents autoCaptureMessages from re-storing identical text when the
+// agent_end event fires multiple times with an overlapping message window
+// (e.g. messages.slice(-8) across consecutive turns).
+const _capturedHashes = new Map<string, Set<string>>();
+
+function _contentFingerprint(text: string): string {
+  return `${text.length}:${text.slice(0, 80)}:${text.slice(-40)}`;
+}
 const DEFAULT_SEARCH_THRESHOLD = 0.5;
 const DEFAULT_FORGET_THRESHOLD = 0.85;
 const DEFAULT_PAGE_SIZE = 10;
@@ -446,6 +456,13 @@ async function autoCaptureMessages(params: {
   messages: unknown[];
 }): Promise<void> {
   const { api, handle, sessionId, messages } = params;
+
+  const cacheKey = sessionId ?? "default";
+  if (!_capturedHashes.has(cacheKey)) {
+    _capturedHashes.set(cacheKey, new Set());
+  }
+  const captured = _capturedHashes.get(cacheKey)!;
+
   const recent = messages.slice(-8);
   let stored = 0;
 
@@ -466,6 +483,10 @@ async function autoCaptureMessages(params: {
       if (text.includes("relevant-memories")) {
         continue; // Skip system-inserted recall contexts
       }
+      const fingerprint = _contentFingerprint(text);
+      if (captured.has(fingerprint)) {
+        continue; // Already stored in a previous agent_end for this session
+      }
       try {
         await handle.memory.add(text, {
           role,
@@ -475,6 +496,7 @@ async function autoCaptureMessages(params: {
             user_id: handle.config.userId,
           }),
         });
+        captured.add(fingerprint);
         stored += 1;
       } catch (err) {
         api.logger.warn(`openclaw-memmachine: auto-capture failed: ${String(err)}`);
