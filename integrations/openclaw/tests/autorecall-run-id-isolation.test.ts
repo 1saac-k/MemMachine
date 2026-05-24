@@ -68,16 +68,16 @@ describe("buildAutoRecallFilter", () => {
     });
   });
 
-  describe("sanitization — single-quote stripping", () => {
-    it("strips single quotes from sessionId", () => {
+  describe("sanitization — single-quote escaping", () => {
+    it("escapes single quotes in sessionId using SQL-style doubling", () => {
       const filter = buildAutoRecallFilter("sess-' OR '1'='1", DEFAULT_USER);
-      // After sanitization the injected content is gone
-      expect(filter).toBe("metadata.run_id = 'sess- OR 1=1'");
+      // Single quotes are doubled so the filter parser re-assembles the literal value
+      expect(filter).toBe("metadata.run_id = 'sess-'' OR ''1''=''1'");
     });
 
-    it("strips single quotes from userId", () => {
+    it("escapes single quotes in userId using SQL-style doubling", () => {
       const filter = buildAutoRecallFilter(SESSION_ID, "real-user-' DROP TABLE");
-      expect(filter).toBe("metadata.user_id = 'real-user- DROP TABLE'");
+      expect(filter).toBe("metadata.user_id = 'real-user-'' DROP TABLE'");
     });
   });
 });

@@ -219,7 +219,7 @@ function requireProjectConfig(
 }
 
 function sanitizeFilterValue(value: string): string {
-  return value.replace(/'/g, "");
+  return value.replace(/'/g, "''");
 }
 
 export function buildScopeFilter(
