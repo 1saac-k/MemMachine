@@ -91,7 +91,7 @@ _TOKEN_SPEC = [
     ("EQ", r"="),
     ("GT", r">"),
     ("LT", r"<"),
-    ("STRING", r"'[^']*'"),
+    ("STRING", r"'(?:[^']|'')*'"),
     ("IDENT", r"[A-Za-z0-9_\.]+"),
     ("WS", r"\s+"),
 ]
@@ -111,8 +111,8 @@ def _tokenize(s: str) -> list[Token]:
         if kind == "WS":
             continue
         if kind == "STRING":
-            # Strip quotes from string literals
-            tokens.append(Token("STRING", value[1:-1]))
+            # Strip outer quotes and unescape SQL-style '' -> '
+            tokens.append(Token("STRING", value[1:-1].replace("''", "'")))
         elif kind == "IDENT":
             upper = value.upper()
             if upper in ("AND", "OR", "IN", "IS", "NOT"):
