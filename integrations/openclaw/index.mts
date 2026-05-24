@@ -280,11 +280,17 @@ function normalizeScope(value: string | undefined, fallback: MemoryScope): Memor
   return fallback;
 }
 
+function normalizeBaseUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.replace(/\/$/, "");
+  return trimmed.endsWith("/v2") ? trimmed : `${trimmed}/v2`;
+}
+
 function resolveMemoryHandle(api: OpenClawPluginApi, ctx: { sessionKey?: string }): MemoryHandle {
   const cfg = resolvePluginConfig(api);
   const { orgId, projectId } = requireProjectConfig(cfg);
   const apiKey = resolveApiKey(cfg);
-  const client = new MemMachineClient({ api_key: apiKey, base_url: cfg.baseUrl });
+  const client = new MemMachineClient({ api_key: apiKey, base_url: normalizeBaseUrl(cfg.baseUrl) });
   const memory = client.project({ org_id: orgId, project_id: projectId }).memory({
     user_id: cfg.userId,
     session_id: ctx.sessionKey,
