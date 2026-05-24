@@ -290,6 +290,36 @@ class IngestionService:
         for command in commands:
             match command.command:
                 case SemanticCommandType.ADD:
+                    # Deduplicate: if an identical feature already exists, only
+                    # record the citation rather than inserting a second copy (#640).
+                    dup_filter = And(
+                        left=And(
+                            left=Comparison(field="set_id", op="=", value=set_id),
+                            right=Comparison(
+                                field="category_name", op="=", value=category_name
+                            ),
+                        ),
+                        right=And(
+                            left=Comparison(
+                                field="feature", op="=", value=command.feature
+                            ),
+                            right=Comparison(field="tag", op="=", value=command.tag),
+                        ),
+                    )
+                    existing = [
+                        f
+                        async for f in self._semantic_storage.get_feature_set(
+                            filter_expr=dup_filter,
+                        )
+                        if f.value == command.value
+                    ]
+                    if existing:
+                        if citation_id is not None and existing[0].metadata.id is not None:
+                            await self._semantic_storage.add_citations(
+                                existing[0].metadata.id, [citation_id]
+                            )
+                        continue
+
                     value_embedding = (await embedder.ingest_embed([command.value]))[0]
 
                     f_id = await self._semantic_storage.add_feature(
