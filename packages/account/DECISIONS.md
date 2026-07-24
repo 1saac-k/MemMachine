@@ -115,3 +115,20 @@
 - **`sync_seed_admins`의 0명 방지 체크는 커밋 전에**: promote/demote를
   ORM 객체에 먼저 적용한 뒤(아직 flush 안 됨) 검사, 위반 시 커밋 없이
   예외 발생 → 세션이 닫히며 변경 폐기(명시적 rollback 불필요).
+
+## M7: 감사 로그 / 헬스체크
+
+- **미들웨어 + `request.state` 마킹 조합**: 매 핸들러에서 감사 로그를
+  직접 쓰지 않고, 인증 의존성(`get_current_user_and_token`)과 프록시
+  핸들러가 `request.state`에 user_id/org_id/project_id를 표시해두면
+  `AuditLogMiddleware`가 응답 이후 한 곳에서 기록. 공개(비인증) 인증
+  엔드포인트(signup/verify-email/resend-code/login/reset-password confirm/
+  unlock)는 의존성을 안 거치므로 각 핸들러에서 직접
+  `mark_audit_user(request, spec.id)` 호출 — 로그인 실패처럼 인증되지
+  않은 시도도 "시도된 id"로 기록하기 위함(§4 명시 요구사항).
+- **미들웨어는 응답을 만든 뒤 별도 세션으로 기록**: 요청 처리에 쓰인
+  세션은 의존성 종료 시점에 이미 닫히므로, 감사 로그는 자체 세션/트랜잭션
+  하나로 따로 커밋(실패해도 본 요청의 트랜잭션과 얽히지 않음).
+- `reset-password/request`(이메일만 받는 엔드포인트)는 감사 로그에 시도
+  id를 남기지 않음 — 사용자 열거 방지 설계(§8.1)와 결이 같아서 의도적으로
+  제외.

@@ -14,10 +14,12 @@ from starlette.types import ExceptionHandler
 from memmachine_account.server import (
     routes_admin,
     routes_auth,
+    routes_health,
     routes_orgs,
     routes_proxy,
     routes_tokens,
 )
+from memmachine_account.server.audit import AuditLogMiddleware
 from memmachine_account.server.config import AppConfig, load_config
 from memmachine_account.server.errors import AccountError
 from memmachine_account.server.storage import (
@@ -48,10 +50,12 @@ def create_app(config: AppConfig) -> FastAPI:
     app.state.engine = engine
 
     app.add_exception_handler(AccountError, cast(ExceptionHandler, _account_error_handler))
+    app.add_middleware(cast(type, AuditLogMiddleware))
     app.include_router(routes_auth.router, prefix="/account/v1")
     app.include_router(routes_tokens.router, prefix="/account/v1")
     app.include_router(routes_orgs.router, prefix="/account/v1")
     app.include_router(routes_admin.router, prefix="/account/v1")
+    app.include_router(routes_health.router, prefix="/account/v1")
     app.include_router(routes_proxy.router)
 
     return app

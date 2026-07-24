@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from memmachine_account.server.audit import mark_audit_user
 from memmachine_account.server.config import AppConfig
 from memmachine_account.server.errors import AccountError
 from memmachine_account.server.storage import User
@@ -31,6 +32,7 @@ ConfigDep = Annotated[AppConfig, Depends(get_config)]
 
 
 async def get_current_user_and_token(
+    request: Request,
     session: SessionDep,
     authorization: Annotated[str | None, Header()] = None,
 ) -> tuple[User, str]:
@@ -41,6 +43,7 @@ async def get_current_user_and_token(
     user = await get_user_for_token(session, raw_token)
     if user is None:
         raise AccountError(401, "invalid, revoked, or inactive token")
+    mark_audit_user(request, user.id)
     return user, raw_token
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 
 from memmachine_account.api.spec import (
     ChangeEmailConfirmRequest,
@@ -25,6 +25,7 @@ from memmachine_account.api.spec import (
     VerifyEmailRequest,
 )
 from memmachine_account.server import auth_service, org_service
+from memmachine_account.server.audit import mark_audit_user
 from memmachine_account.server.deps import (
     ConfigDep,
     CurrentUserAndTokenDep,
@@ -36,8 +37,11 @@ router = APIRouter(tags=["Auth"])
 
 
 @router.post("/signup", status_code=201)
-async def signup(spec: SignupRequest, session: SessionDep, config: ConfigDep) -> SignupResponse:
+async def signup(
+    spec: SignupRequest, request: Request, session: SessionDep, config: ConfigDep
+) -> SignupResponse:
     """Create a pending account and send a signup verification code."""
+    mark_audit_user(request, spec.id)
     user = await auth_service.signup(session, config, spec.id, spec.email, spec.password)
     return SignupResponse(
         id=user.id, email=user.email, status=user.status, personal_org_id=user.personal_org_id
@@ -45,22 +49,29 @@ async def signup(spec: SignupRequest, session: SessionDep, config: ConfigDep) ->
 
 
 @router.post("/verify-email")
-async def verify_email(spec: VerifyEmailRequest, session: SessionDep) -> StatusResponse:
+async def verify_email(spec: VerifyEmailRequest, request: Request, session: SessionDep) -> StatusResponse:
     """Confirm a signup verification code."""
+    mark_audit_user(request, spec.id)
     user = await auth_service.verify_email(session, spec.id, spec.code)
     return StatusResponse(status=user.status)
 
 
 @router.post("/resend-code", status_code=202)
-async def resend_code(spec: ResendCodeRequest, session: SessionDep, config: ConfigDep) -> MessageResponse:
+async def resend_code(
+    spec: ResendCodeRequest, request: Request, session: SessionDep, config: ConfigDep
+) -> MessageResponse:
     """Resend a signup-verification or lockout-reset code."""
+    mark_audit_user(request, spec.id)
     await auth_service.resend_code(session, config, spec.id)
     return MessageResponse(message="a new code has been sent")
 
 
 @router.post("/login")
-async def login(spec: LoginRequest, session: SessionDep, config: ConfigDep) -> LoginResponse:
+async def login(
+    spec: LoginRequest, request: Request, session: SessionDep, config: ConfigDep
+) -> LoginResponse:
     """Authenticate and issue a bearer token."""
+    mark_audit_user(request, spec.id)
     user, raw_token = await auth_service.login(session, config, spec.id, spec.password)
     return LoginResponse(
         token=raw_token,
@@ -87,16 +98,20 @@ async def reset_password_request(
 
 @router.post("/reset-password/confirm")
 async def reset_password_confirm(
-    spec: ResetPasswordConfirmRequest, session: SessionDep, config: ConfigDep
+    spec: ResetPasswordConfirmRequest, request: Request, session: SessionDep, config: ConfigDep
 ) -> MessageResponse:
     """Confirm a password-reset code and set a new password."""
+    mark_audit_user(request, spec.id)
     await auth_service.confirm_password_reset(session, config, spec.id, spec.code, spec.new_password)
     return MessageResponse(message="password has been reset")
 
 
 @router.post("/unlock")
-async def unlock(spec: UnlockRequest, session: SessionDep, config: ConfigDep) -> StatusResponse:
+async def unlock(
+    spec: UnlockRequest, request: Request, session: SessionDep, config: ConfigDep
+) -> StatusResponse:
     """Confirm a lockout-reset code, set a new password, and reactivate the account."""
+    mark_audit_user(request, spec.id)
     user = await auth_service.unlock(session, config, spec.id, spec.code, spec.new_password)
     return StatusResponse(status=user.status)
 

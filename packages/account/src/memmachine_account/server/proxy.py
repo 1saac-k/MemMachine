@@ -14,6 +14,7 @@ import httpx
 from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from memmachine_account.server.audit import mark_audit_org
 from memmachine_account.server.config import AppConfig
 from memmachine_account.server.errors import AccountError
 from memmachine_account.server.org_service import is_member_of_org
@@ -115,7 +116,8 @@ async def handle_proxy_request(
         upstream_response = await forward_to_memmachine(config, request.method, full_path, body)
         return await _filtered_projects_list_response(upstream_response, user, session)
 
-    org_id, _project_id = _require_explicit_org_and_project(body)
+    org_id, project_id = _require_explicit_org_and_project(body)
+    mark_audit_org(request, org_id, project_id)
     if not await is_member_of_org(session, user, org_id):
         raise AccountError(403, "not a member of this org")
 
