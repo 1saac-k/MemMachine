@@ -28,6 +28,20 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def as_aware_utc(value: datetime) -> datetime:
+    """Reattach UTC tzinfo to a datetime read back from SQLite.
+
+    SQLite (via aiosqlite) does not persist tzinfo even for
+    `DateTime(timezone=True)` columns: values written as aware UTC come
+    back naive. Callers that compare a DB-sourced datetime against
+    `utcnow()` must pass it through this first, or the comparison raises
+    `TypeError: can't compare offset-naive and offset-aware datetimes`.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
 class UserStatus(enum.StrEnum):
     """Lifecycle status of a User account (DESIGN.md §4)."""
 

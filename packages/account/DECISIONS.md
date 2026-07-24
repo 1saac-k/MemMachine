@@ -35,3 +35,33 @@
   httpx, aiosmtplib)는 각각 최신 안정 메이저와 호환되는 하한선만 지정
   (`argon2-cffi>=23.1.0`, `httpx>=0.28.0`, `aiosmtplib>=3.0.0`). CLI HTTP
   호출은 `requests`(memmachine-client와 동일 라이브러리)로 통일.
+- **SQLite tzinfo 버그 실측 확인**: `DateTime(timezone=True)` 컬럼에 aware
+  UTC datetime을 저장해도 aiosqlite로 다시 읽으면 tzinfo가 사라져 naive가
+  됨(직접 스크립트로 재현 확인). `datetime.now(UTC)`와 직접 비교하면
+  `TypeError`. `storage.as_aware_utc()` 헬퍼로 DB에서 읽은 시각은 항상
+  보정 후 비교하도록 통일.
+
+## M2: 인증 코어
+
+- **비밀번호 해시**: argon2id(느림, 저엔트로피 사람 비밀번호에 적합).
+  **코드/토큰 해시**: sha256(고엔트로피 랜덤값이나 단명 코드라 느린 해시
+  불필요 — 코드는 만료+1회성 소모로 이미 보호되고, 토큰은 32바이트
+  랜덤이라 sha256 역상 저항성으로 충분. GitHub PAT 등 업계 관행과 동일).
+- **코드 재발급 시 "이전 코드 무효화"**: 별도 삭제/플래그 없이, 검증 시
+  **항상 가장 최근(created_at 내림차순) 미소비 챌린지만** 확인하도록 구현.
+  이전 코드는 자동으로 무의미해짐(굳이 명시적으로 지우지 않음) — 더 단순.
+- **로그인 실패 카운트 처리 순서**: 계정 상태(locked/pending/deactivated)를
+  **비밀번호 검증보다 먼저** 확인. locked 계정은 비밀번호가 랜덤화돼 있어
+  이미 항상 불일치가 나므로, 상태 체크를 먼저 안 하면 실패 카운트가
+  무의미하게 계속 올라감.
+- **비밀번호 재설정 요청 시 계정 상태 무관 처리**: `pending_verification`/
+  `deactivated` 상태 사용자도 재설정 이메일은 받을 수 있게 함(단순화 —
+  재설정은 password_hash만 바꾸고 status는 안 바꾸므로, 재설정 후에도
+  기존 상태별 로그인 제약은 그대로 유지되어 안전).
+- **`GET`이 아니라 `POST`로 read-only에 가까운 요청도 처리**: DESIGN.md
+  §8.2 그대로 따름(멱등이 아닌 부수효과가 있는 호출이 대부분이라 POST가
+  자연스러움 — MemMachine 자체 API도 조회성 호출에 POST를 광범위하게 씀).
+- **테스트가 실제 버그를 잡음**: `security.py`의 `_ID_SPECIAL_CHARS`에
+  `_`(밑줄)이 실수로 남아있었음(id 문자 규칙은 `_` 금지가 최종 결정인데,
+  구현 시 이전 초안 값을 그대로 옮겨적음). `test_signup_rejects_invalid_id`
+  파라미터 케이스 중 `al_ice`가 400 대신 201을 반환해서 발견, 즉시 수정.
