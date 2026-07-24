@@ -136,3 +136,60 @@ class TokenListResponse(BaseModel):
     """Response body for `GET /account/v1/tokens`."""
 
     tokens: list[TokenInfo]
+
+
+class OrgInfo(BaseModel):
+    """A single org entry as seen by one of its members."""
+
+    org_id: str
+    kind: str
+    role: str
+
+
+class OrgListResponse(BaseModel):
+    """Response body for `GET /account/v1/orgs` and the `orgs` field of `GET /account/v1/me`."""
+
+    orgs: list[OrgInfo]
+
+
+class CreateOrgRequest(BaseModel):
+    """Request body for `POST /account/v1/orgs`."""
+
+    org_id: str
+
+
+class MemberInfo(BaseModel):
+    """A single member entry as shown by `GET /account/v1/orgs/{org_id}/members`."""
+
+    user_id: str
+    role: str
+
+
+class MemberListResponse(BaseModel):
+    """Response body for `GET /account/v1/orgs/{org_id}/members`."""
+
+    members: list[MemberInfo]
+
+
+class AddMemberRequest(BaseModel):
+    """Request body for `POST /account/v1/orgs/{org_id}/members`."""
+
+    user_id: str
+    role: str = "member"
+
+
+class SetRoleRequest(BaseModel):
+    """Request body for `POST /account/v1/orgs/{org_id}/members/{user_id}/set-role`."""
+
+    role: str
+
+
+class MeResponse(BaseModel):
+    """Response body for `GET /account/v1/me`."""
+
+    id: str
+    email: str
+    is_admin: bool
+    status: str
+    created_at: datetime
+    orgs: list[OrgInfo]

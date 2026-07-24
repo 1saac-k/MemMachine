@@ -85,3 +85,26 @@ def generate_bearer_token() -> str:
 def hash_token(token: str) -> str:
     """Hash a bearer token for at-rest storage (sha256 is sufficient for high-entropy input)."""
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+_ORG_ID_ALLOWED_CHARS = set(string.ascii_lowercase + string.digits)
+_ORG_ID_SPECIAL_CHARS = set("-_")
+
+
+def is_valid_org_id(value: str) -> bool:
+    """Validate a freshly-chosen shared org_id: lowercase/digits/-/_, same edge rules as ids.
+
+    Unlike account ids (security.is_valid_account_id), a shared org_id is
+    typed fresh by its creator rather than derived from an existing id, so
+    it allows "_" directly and needs no "." (DESIGN.md §4).
+    """
+    if not value:
+        return False
+    if not all(char in _ORG_ID_ALLOWED_CHARS or char in _ORG_ID_SPECIAL_CHARS for char in value):
+        return False
+    if value[0] in _ORG_ID_SPECIAL_CHARS or value[-1] in _ORG_ID_SPECIAL_CHARS:
+        return False
+    return not any(
+        left in _ORG_ID_SPECIAL_CHARS and right in _ORG_ID_SPECIAL_CHARS
+        for left, right in pairwise(value)
+    )

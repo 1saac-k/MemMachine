@@ -12,7 +12,9 @@ from memmachine_account.api.spec import (
     LoginRequest,
     LoginResponse,
     LoginUser,
+    MeResponse,
     MessageResponse,
+    OrgInfo,
     ResendCodeRequest,
     ResetPasswordConfirmRequest,
     ResetPasswordRequestRequest,
@@ -22,7 +24,7 @@ from memmachine_account.api.spec import (
     UnlockRequest,
     VerifyEmailRequest,
 )
-from memmachine_account.server import auth_service
+from memmachine_account.server import auth_service, org_service
 from memmachine_account.server.deps import (
     ConfigDep,
     CurrentUserAndTokenDep,
@@ -124,3 +126,24 @@ async def change_email_confirm(
     """Confirm an email change."""
     new_email = await auth_service.confirm_email_change(session, user, spec.code)
     return ChangeEmailResponse(email=new_email)
+
+
+@router.get("/me")
+async def me(user: CurrentUserDep, session: SessionDep) -> MeResponse:
+    """Return the current user's info and org memberships."""
+    memberships = await org_service.list_orgs_for_user(session, user)
+    return MeResponse(
+        id=user.id,
+        email=user.email,
+        is_admin=user.is_admin,
+        status=user.status,
+        created_at=user.created_at,
+        orgs=[
+            OrgInfo(
+                org_id=m.org_id,
+                kind="personal" if m.org_id == user.personal_org_id else "shared",
+                role=m.role,
+            )
+            for m in memberships
+        ],
+    )
