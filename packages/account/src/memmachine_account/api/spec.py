@@ -2,10 +2,12 @@
 
 Named and shaped to mirror `memmachine_common.api.spec` conventions. Models
 for endpoints not yet implemented land in the commit that implements them
-(orgs/tokens in M3-M4, admin in M6).
+(orgs in M4, admin in M6).
 """
 
 from __future__ import annotations
+
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -120,3 +122,17 @@ class ChangeEmailResponse(BaseModel):
     """Response body for `POST /account/v1/change-email/confirm`."""
 
     email: str
+
+
+class TokenInfo(BaseModel):
+    """A single token entry as shown by `GET /account/v1/tokens` (never the raw value)."""
+
+    token_id: str
+    created_at: datetime
+    last_used_at: datetime | None
+
+
+class TokenListResponse(BaseModel):
+    """Response body for `GET /account/v1/tokens`."""
+
+    tokens: list[TokenInfo]

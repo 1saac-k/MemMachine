@@ -55,3 +55,26 @@ async def revoke_token_by_hash(session: AsyncSession, raw_token: str) -> bool:
     token.revoked_at = datetime.now(UTC)
     await session.commit()
     return True
+
+
+async def list_tokens(session: AsyncSession, user_id: str) -> list[Token]:
+    """List all tokens (revoked and unrevoked) owned by a user, newest first."""
+    result = await session.execute(
+        select(Token).where(Token.user_id == user_id).order_by(Token.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def revoke_token_by_id(session: AsyncSession, user_id: str, token_id: str) -> bool:
+    """Revoke a token by id, but only if it belongs to the given user.
+
+    Returns False (rather than raising) for both "no such token" and "not
+    yours" so callers can render a uniform 404 without leaking which case
+    it was.
+    """
+    token = await session.get(Token, token_id)
+    if token is None or token.user_id != user_id or token.revoked_at is not None:
+        return False
+    token.revoked_at = datetime.now(UTC)
+    await session.commit()
+    return True
