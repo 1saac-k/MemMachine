@@ -749,8 +749,9 @@ packages/account/
       mail.py               # SMTP 발송
     cli/
       __init__.py
-      main.py            # `memmachine-account` 진입점
-      commands/            # signup/login/org/project/admin 서브커맨드
+      main.py            # argparse 파서 구성 + 커맨드 dispatch (`memmachine-account` 진입점)
+      client.py           # gateway REST API용 얇은 requests 래퍼
+      credentials.py        # 로그인 토큰 저장/로드 (~/.config/memmachine-account/credentials)
   account_tests/
     ...                   # 단위/통합 테스트 (§14)
 ```

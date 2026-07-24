@@ -132,3 +132,25 @@
 - `reset-password/request`(이메일만 받는 엔드포인트)는 감사 로그에 시도
   id를 남기지 않음 — 사용자 열거 방지 설계(§8.1)와 결이 같아서 의도적으로
   제외.
+
+## M8: CLI
+
+- **`cli/commands/` 서브패키지 미사용**: DESIGN.md §12 트리는 참고
+  제안("제안"이라고 명시)이었고, 실제 명령 개수를 다뤄보니 argparse
+  서브파서 구성과 dispatch를 한 `cli/main.py`에 두는 편이 argparse
+  자체의 트리 구조와 자연스럽게 맞아 더 읽기 쉬웠음. 빈 `cli/commands/`
+  스텁 패키지는 제거.
+- **에러 메시지 추출은 `{"detail":{"message":...}}` 파싱**: §8.1 에러
+  포맷을 그대로 신뢰. JSON이 아니거나 `detail`이 기대한 모양이 아니면
+  `HTTP {status_code}`로 폴백.
+- **JSON 값 타입은 `pydantic.JsonValue`**: `Any` 대신 사용(ruff ANN401이
+  `Any` 반환 타입을 금지). 다만 로그인 응답처럼 dict임이 확실한 지점은
+  `assert isinstance(result, dict)`로 좁혀서 `ty`가 `result["token"]`
+  접근을 허용하도록 함.
+- **자격증명 파일은 평문 JSON + `chmod 0600`**: DESIGN.md는 "평문 저장"만
+  명시했지만, 같은 머신의 다른 로컬 계정으로부터 최소한의 보호는 비용
+  없이 추가할 수 있어 적용.
+- **`credentials-file`/`--yes` 없는 삭제성 명령은 항상 재확인 프롬프트**:
+  `project delete`/`admin purge-user` 둘 다 대상 id를 그대로 타이핑해야
+  진행되고, 틀리면 API 호출 자체가 발생하지 않음(테스트로 확인:
+  `fake_requests.calls == []`).
