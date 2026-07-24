@@ -1,10 +1,11 @@
 [tool.uv.workspace]
-members = ["packages/client", "packages/common", "packages/server"]
+members = ["packages/client", "packages/common", "packages/server", "packages/account"]
 
 [tool.uv.sources]
 memmachine-common = { workspace = true }
 memmachine-server = { workspace = true }
 memmachine-client = { workspace = true }
+memmachine-account = { workspace = true }
 
 [tool.uv]
 constraint-dependencies = [
@@ -102,6 +103,7 @@ convention = "google"
 "packages/client/client_tests/**/*.py" = ["ANN", "D", "SLF", "ARG"]
 "packages/server/server_tests/**/*.py" = ["ANN", "D", "SLF", "ARG"]
 "packages/common/common_tests/**/*.py" = ["ANN", "D", "SLF", "ARG"]
+"packages/account/account_tests/**/*.py" = ["ANN", "D", "SLF", "ARG"]
 "tools/**/*.py" = ["SIM", "DTZ", "C9", "ANN", "T201", "PT", "INP", "PTH", "D"]
 "examples/**" = [
     "ANN",
@@ -145,7 +147,7 @@ convention = "google"
 ]
 
 [tool.ty.environment]
-extra-paths = ["packages/common/src", "packages/server/src", "packages/client/src"]
+extra-paths = ["packages/common/src", "packages/server/src", "packages/client/src", "packages/account/src"]
 
 [tool.ty.src]
 exclude = ["packages/**/build/**"]
@@ -161,7 +163,7 @@ markers = [
 ]
 
 [tool.complexipy]
-paths = ["packages/server/src", "packages/client/src", "packages/common/src"]
+paths = ["packages/server/src", "packages/client/src", "packages/common/src", "packages/account/src"]
 max-complexity-allowed = 10
 quiet = false
 ignore-complexity = false
@@ -175,6 +177,7 @@ source = [
     "packages/server/src/memmachine",
     "packages/client/src/memmachine_client",
     "packages/common/src/memmachine_common",
+    "packages/account/src/memmachine_account",
 ]
 
 [tool.coverage.report]

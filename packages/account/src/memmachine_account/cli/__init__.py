@@ -1,0 +1,1 @@
+"""memmachine-account CLI."""

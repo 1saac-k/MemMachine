@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memmachine-account"
+dynamic = ["version"]
+dependencies = [
+    "fastapi>=0.116.1",
+    "uvicorn>=0.35.0",
+    "sqlalchemy>=2.0.43",
+    "aiosqlite>=0.20.0",
+    "pydantic>=2.11.7",
+    "argon2-cffi>=23.1.0",
+    "httpx>=0.28.0",
+    "aiosmtplib>=3.0.0",
+    "pyyaml>=6.0.2",
+    "requests>=2.33.0",
+    "typing-extensions>=4.0.0",
+]
+requires-python = ">= 3.12"
+authors = [
+  {name="MemMachine", email="noreply@memmachine.ai"},
+]
+description = "MemMachine Account - Member management gateway and CLI for on-premise MemMachine deployments"
+readme = "README.md"
+keywords = ["memmachine", "account", "auth", "gateway", "cli"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+license = "Apache-2.0"
+
+[project.urls]
+Homepage = "https://github.com/MemMachine/MemMachine"
+Issues = "https://github.com/MemMachine/MemMachine/issues"
+
+[project.scripts]
+memmachine-account = "memmachine_account.cli.main:main"
+memmachine-account-server = "memmachine_account.server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+root = "../.."
+
+[tool.uv]
+package = true
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+target-version = "py312"
