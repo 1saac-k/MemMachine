@@ -1,0 +1,39 @@
+# memmachine-account-server config (packages/account/DESIGN.md §10).
+# Copy this file to `account.yml` at the repository root (docker-compose.yml
+# mounts it read-only into the `account` service) and fill in the SMTP
+# credentials and your company's email domain(s).
+
+server:
+  host: 0.0.0.0
+  port: 8090
+  workers: 1              # SQLite-backed - keep at 1 unless you've enabled WAL mode yourself
+
+logging:
+  level: info              # debug | info | warning | error | critical
+  format: "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+
+memmachine_upstream:
+  base_url: http://memmachine:8080   # compose network service name, not localhost
+  timeout_seconds: 30
+
+storage:
+  sqlite_path: /data/memmachine-account.db   # matches the account_data volume mount
+
+auth:
+  allowed_email_domains:
+    - your-company.com
+  seed_admins:
+    - admin@your-company.com
+  password_min_length: 8
+  failed_login_lockout_threshold: 5
+  email_code_length: 6
+  email_code_expiry_minutes: 30
+
+smtp:
+  host: smtp.your-company.com
+  port: 587
+  username: notifications@your-company.com
+  password: <SMTP_PASSWORD>
+  from_address: memmachine-noreply@your-company.com
+  encryption: starttls    # starttls (587) | ssl (465, implicit TLS) | none
+  timeout_seconds: 10

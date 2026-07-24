@@ -840,11 +840,24 @@ wait_for_health() {
     fi
     
     # Wait for MemMachine
+    # NOTE: MemMachine's port is no longer published to the host (it has no
+    # auth of its own - see packages/account/DESIGN.md §2/§11), so this
+    # checks from inside the container, the same way the postgres/neo4j
+    # checks above already do.
     print_info "Waiting for MemMachine to be ready..."
-    if timeout 120 bash -c "until curl -f http://localhost:${MEMORY_SERVER_PORT:-8080}/api/v2/health > /dev/null 2>&1; do sleep 5; done"; then
+    if timeout 120 bash -c "until docker exec memmachine-app curl -f http://localhost:8080/api/v2/health > /dev/null 2>&1; do sleep 5; done"; then
         print_success "MemMachine is ready"
     else
         print_error "MemMachine failed to become ready in 120 seconds. Check container logs and configuration."
+        exit 1
+    fi
+
+    # Wait for the account gateway
+    print_info "Waiting for the account gateway to be ready..."
+    if timeout 120 bash -c "until curl -f http://localhost:${MEMMACHINE_ACCOUNT_PORT:-8090}/account/v1/health > /dev/null 2>&1; do sleep 5; done"; then
+        print_success "Account gateway is ready"
+    else
+        print_error "Account gateway failed to become ready in 120 seconds. Check container logs and configuration."
         exit 1
     fi
 }
@@ -854,10 +867,13 @@ show_service_info() {
     print_success "🎉 MemMachine is now running!"
     echo ""
     echo "Service URLs:"
-    echo "  📊 MemMachine API Docs: http://localhost:${MEMORY_SERVER_PORT:-8080}/docs"
+    echo "  🔐 Account Gateway (start here): http://localhost:${MEMMACHINE_ACCOUNT_PORT:-8090}"
+    echo "  📈 Account Gateway Health: http://localhost:${MEMMACHINE_ACCOUNT_PORT:-8090}/account/v1/health"
     echo "  🗄️  Neo4j Browser: http://localhost:${NEO4J_HTTP_PORT:-7474}"
-    echo "  📈 Health Check: http://localhost:${MEMORY_SERVER_PORT:-8080}/api/v2/health"
-    echo "  📊 Metrics: http://localhost:${MEMORY_SERVER_PORT:-8080}/api/v2/metrics"
+    echo ""
+    echo "  ℹ️  MemMachine's own API/docs/metrics are no longer published to the"
+    echo "     host - all client traffic (memmachine CLI, MCP, memmachine-account"
+    echo "     CLI) goes through the Account Gateway above."
     echo ""
     echo "Database Access:"
     echo "  🐘 PostgreSQL: localhost:${POSTGRES_PORT:-5432} (user: ${POSTGRES_USER:-memmachine}, db: ${POSTGRES_DB:-memmachine})"

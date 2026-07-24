@@ -57,13 +57,15 @@ services:
       - memmachine-network
 
   # MemMachine application
+  # NOTE: no `ports:` here on purpose - MemMachine has no authentication of
+  # its own, so it is reachable only from inside the compose network. All
+  # client traffic goes through the `account` gateway below instead
+  # (packages/account/DESIGN.md §2/§11).
   memmachine:
     image: ${MEMMACHINE_IMAGE:-memmachine/memmachine}
     pull_policy: ${PULL_POLICY:-always}
     container_name: memmachine-app
     restart: unless-stopped
-    ports:
-      - "${MEMORY_SERVER_PORT:-8080}:8080"
     environment:
       # Database configuration
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -107,6 +109,34 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  # Member-management gateway (packages/account) - the only publicly exposed
+  # entry point for /api/v2/* and /account/v1/* traffic (see note on
+  # `memmachine` above).
+  account:
+    build:
+      context: .
+      dockerfile: Dockerfile.account
+    container_name: memmachine-account
+    restart: unless-stopped
+    ports:
+      - "${MEMMACHINE_ACCOUNT_PORT:-8090}:8090"
+    environment:
+      MEMMACHINE_ACCOUNT_CONFIG: /config/account.yml
+    volumes:
+      - ./account.yml:/config/account.yml:ro,Z
+      - account_data:/data
+    depends_on:
+      memmachine:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8090/account/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - memmachine-network
+
   docs:
     build:
       context: docs/
@@ -128,6 +158,8 @@ volumes:
   neo4j_plugins:
     driver: local
   memmachine_logs:
+    driver: local
+  account_data:
     driver: local
 
 networks:

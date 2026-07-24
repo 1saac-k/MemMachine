@@ -154,3 +154,26 @@
   `project delete`/`admin purge-user` 둘 다 대상 id를 그대로 타이핑해야
   진행되고, 틀리면 API 호출 자체가 발생하지 않음(테스트로 확인:
   `fake_requests.calls == []`).
+
+## M9: Docker/compose 통합 + 스모크 테스트
+
+- **`memmachine-compose.sh`도 함께 수정**: DESIGN.md는 `docker-compose.yml`만
+  다뤘지만, 실제로 저장소를 뒤져보니 이 스크립트가 `MEMORY_SERVER_PORT`로
+  호스트에 노출된 MemMachine 포트를 직접 curl하는 헬스체크와 안내 URL을
+  갖고 있어서, 포트를 막으면 이 스크립트가 깨짐. MemMachine 헬스체크는
+  postgres/neo4j와 동일하게 `docker exec`로 컨테이너 내부에서 확인하도록
+  바꾸고, account 게이트웨이용 헬스체크/안내 URL을 새로 추가. `docker
+  compose config`로 문법 검증(데몬 없이도 가능, 데몬 자체는 이 샌드박스에서
+  접근 불가라 `up`으로 실제 기동은 못 해봄).
+- **`sample_configs/env.dockercompose`에 `MEMMACHINE_ACCOUNT_PORT` 추가**,
+  `sample_configs/account.yml.sample` 신설(§10 스키마와 어긋나지 않는지는
+  `test_config.py`가 실제로 `load_config()`로 파싱해서 회귀 검증).
+- **실제 통합 스모크 테스트(§14.2)는 작성했지만 이 세션에서 실행은 못 함**:
+  샌드박스에 `docker` CLI는 있지만 데몬이 연결 안 돼서 postgres/neo4j/
+  memmachine 전체 스택을 못 띄움(임베더/LLM 자격증명도 없음). 대신
+  `MEMMACHINE_INTEGRATION_BASE_URL` 환경변수로 **이미 떠 있는** MemMachine
+  인스턴스를 가리키면 도는 `@pytest.mark.integration` 테스트로 작성(기존
+  저장소 컨벤션인 `-m "not integration"` 기본 제외와 동일하게 동작,
+  env var 없으면 명확한 메시지로 skip). 실제 docker/LLM 자격증명이 있는
+  환경에서 반드시 한 번 돌려서 확인 필요 — 이 문서에서 가장 중요한 미검증
+  항목.
