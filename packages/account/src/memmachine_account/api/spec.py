@@ -193,3 +193,68 @@ class MeResponse(BaseModel):
     status: str
     created_at: datetime
     orgs: list[OrgInfo]
+
+
+class AdminUserInfo(BaseModel):
+    """A single user entry as shown by `GET /account/v1/admin/users`."""
+
+    id: str
+    email: str
+    is_admin: bool
+    status: str
+    created_at: datetime
+
+
+class AdminUserListResponse(BaseModel):
+    """Response body for `GET /account/v1/admin/users`."""
+
+    users: list[AdminUserInfo]
+
+
+class DeactivateUserResponse(BaseModel):
+    """Response body for `POST /account/v1/admin/users/{id}/deactivate`."""
+
+    id: str
+    status: str
+
+
+class PurgeUserRequest(BaseModel):
+    """Request body for `POST /account/v1/admin/users/{id}/purge`. `confirm_id` must equal `id`."""
+
+    confirm_id: str
+
+
+class PurgeUserResponse(BaseModel):
+    """Response body for `POST /account/v1/admin/users/{id}/purge`."""
+
+    id: str
+    deleted_org_ids: list[str]
+
+
+class RevokeTokensResponse(BaseModel):
+    """Response body for `POST /account/v1/admin/users/{id}/revoke-tokens`."""
+
+    id: str
+    revoked_count: int
+
+
+class SyncSeedAdminsResponse(BaseModel):
+    """Response body for `POST /account/v1/admin/sync-seed-admins`."""
+
+    promoted: list[str]
+    demoted: list[str]
+
+
+class AdminOrgInfo(BaseModel):
+    """A single org entry as shown by `GET /account/v1/admin/orgs`."""
+
+    org_id: str
+    kind: str
+    created_by: str
+    member_count: int
+
+
+class AdminOrgListResponse(BaseModel):
+    """Response body for `GET /account/v1/admin/orgs`."""
+
+    orgs: list[AdminOrgInfo]

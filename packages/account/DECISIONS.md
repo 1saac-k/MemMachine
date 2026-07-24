@@ -102,3 +102,16 @@
 - **감사 로그는 아직 안 붙임**: DESIGN.md §15 파이프라인에 감사 로그
   기록이 있지만, 마일스톤 계획(§16)상 M7에서 전체 경로(control-plane +
   프록시)에 한 번에 배선하기로 했으므로 M5에서는 미룸.
+
+## M6: Admin
+
+- **`purge_user`는 `server/proxy.py`의 `forward_to_memmachine`을 재사용**:
+  MemMachine 호출 로직(httpx client 생성, base_url/timeout 적용)을
+  중복 작성하지 않고 M5에서 만든 걸 public으로 승격해서 그대로 씀.
+- **`list_orgs`가 dict가 아니라 `AdminOrgInfo`(pydantic)를 직접 반환**:
+  처음엔 `list[dict[str, str|int]]`로 만들었다가 `ty`가 필드별 타입을
+  구분 못 해서 에러(`org_id`는 str인데 `str|int` 유니온으로만 보임) —
+  서비스 레이어에서 바로 응답 모델을 만들도록 수정.
+- **`sync_seed_admins`의 0명 방지 체크는 커밋 전에**: promote/demote를
+  ORM 객체에 먼저 적용한 뒤(아직 flush 안 됨) 검사, 위반 시 커밋 없이
+  예외 발생 → 세션이 닫히며 변경 폐기(명시적 rollback 불필요).

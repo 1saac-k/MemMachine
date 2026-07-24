@@ -112,14 +112,14 @@ async def handle_proxy_request(
     body = await _read_json_body(request)
 
     if full_path == LIST_PROJECTS_PATH:
-        upstream_response = await _forward(config, request.method, full_path, body)
+        upstream_response = await forward_to_memmachine(config, request.method, full_path, body)
         return await _filtered_projects_list_response(upstream_response, user, session)
 
     org_id, _project_id = _require_explicit_org_and_project(body)
     if not await is_member_of_org(session, user, org_id):
         raise AccountError(403, "not a member of this org")
 
-    upstream_response = await _forward(config, request.method, full_path, body)
+    upstream_response = await forward_to_memmachine(config, request.method, full_path, body)
     return Response(
         content=upstream_response.content,
         status_code=upstream_response.status_code,
@@ -127,7 +127,8 @@ async def handle_proxy_request(
     )
 
 
-async def _forward(config: AppConfig, method: str, path: str, body: dict) -> httpx.Response:
+async def forward_to_memmachine(config: AppConfig, method: str, path: str, body: dict) -> httpx.Response:
+    """Make one HTTP call to the MemMachine upstream (also reused by server/admin_service.py)."""
     async with httpx.AsyncClient(
         base_url=config.memmachine_upstream.base_url,
         timeout=config.memmachine_upstream.timeout_seconds,
