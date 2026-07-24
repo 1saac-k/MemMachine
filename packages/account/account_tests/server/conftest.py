@@ -1,12 +1,14 @@
-"""Shared fixtures for account server tests: app + client with mocked SMTP."""
+"""Shared fixtures for account server tests: app + client with mocked SMTP/MemMachine."""
 
 from pathlib import Path
 
+import httpx
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from memmachine_account.server import auth_service
+from memmachine_account.server import proxy as proxy_module
 from memmachine_account.server.app import create_app
 from memmachine_account.server.config import (
     AppConfig,
@@ -58,3 +60,36 @@ async def client(config: AppConfig):
 def extract_code(body: str) -> str:
     """Pull the numeric code out of a rendered code email body (see server/mail.py)."""
     return body.split("Your code is: ")[1].split("\n", maxsplit=1)[0]
+
+
+@pytest.fixture
+def upstream(monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    """Replace the proxy's httpx.AsyncClient with one backed by an in-process MockTransport.
+
+    Tests set `upstream["handler"]` to a `(httpx.Request) -> httpx.Response`
+    callable simulating MemMachine; `upstream["requests"]` records every
+    request that actually reached the (mock) upstream, so tests can assert
+    a request was rejected *before* being forwarded.
+    """
+    state: dict[str, object] = {
+        "handler": lambda _request: httpx.Response(200, json={}),
+        "requests": [],
+    }
+
+    def record_and_dispatch(request: httpx.Request) -> httpx.Response:
+        state["requests"].append(request)  # type: ignore[attr-defined]
+        return state["handler"](request)  # type: ignore[operator]
+
+    real_async_client = httpx.AsyncClient  # capture before patching - see comment below
+
+    def fake_async_client(*, base_url: str, timeout: float) -> httpx.AsyncClient:
+        # `proxy_module.httpx` is the *same* module object as this file's
+        # `httpx` import, so patching `.AsyncClient` on it patches the real
+        # httpx module globally - referencing `httpx.AsyncClient` in here
+        # would recurse into this fake. Use the pre-patch class instead.
+        return real_async_client(
+            transport=httpx.MockTransport(record_and_dispatch), base_url=base_url, timeout=timeout
+        )
+
+    monkeypatch.setattr(proxy_module.httpx, "AsyncClient", fake_async_client)
+    return state

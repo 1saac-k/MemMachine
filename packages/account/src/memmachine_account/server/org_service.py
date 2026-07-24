@@ -16,6 +16,18 @@ from memmachine_account.server.errors import AccountError
 from memmachine_account.server.storage import Org, OrgKind, OrgMembership, OrgRole, User
 
 
+async def is_member_of_org(session: AsyncSession, user: User, org_id: str) -> bool:
+    """Check whether a user may access an org: owns it as their personal org, or is a member.
+
+    Used by the gateway proxy (server/proxy.py) to gate `/api/v2/*` calls -
+    membership here is *access*, not a role check (owner vs member both
+    pass; §6: no per-project ACL, org membership is the whole grant).
+    """
+    if org_id == user.personal_org_id:
+        return True
+    return await _get_membership(session, org_id, user.id) is not None
+
+
 async def create_org(session: AsyncSession, user: User, org_id: str) -> Org:
     """Create a new shared org; the creator becomes its sole owner."""
     if not security.is_valid_org_id(org_id):

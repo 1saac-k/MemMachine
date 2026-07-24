@@ -82,3 +82,23 @@
   멤버십 조작은 요청자가 누구든(오너 자신 포함) 무조건 400 — "이 org는
   애초에 멤버십 개념이 없다"는 게 "권한 없음"보다 우선하는 사실이라 순서를
   이렇게 정함.
+
+## M5: 게이트웨이 프록시
+
+- **MemMachine mock은 `respx` 대신 httpx 내장 `MockTransport`** 사용 —
+  새 의존성 없이 표준 라이브러리 수준에서 이미 되는 걸 굳이 추가 안 함.
+- **테스트 인프라 버그(자기참조) 실측 발견**: `monkeypatch.setattr(proxy_module.httpx,
+  "AsyncClient", fake)`로 패치하면 `proxy_module.httpx`가 테스트 파일이
+  import한 `httpx`와 **동일한 모듈 객체**라서, `httpx` 전역이 패치되어
+  버림. fake 함수 안에서 다시 `httpx.AsyncClient(...)`를 부르면 자기
+  자신을 재귀 호출하게 되어 `TypeError: unexpected keyword argument
+  'transport'`로 즉시 실패. 패치 전에 진짜 클래스를 변수로 캡처해두고
+  그걸 쓰도록 수정. (unit 테스트가 아니라 테스트 픽스처 자체의 버그였지만,
+  실행해서 바로 드러났고 원인도 명확해서 즉시 고침.)
+- **`/api/v2/{path:path}` 캐치올 라우트**: MemMachine 엔드포인트 하나하나를
+  다시 선언하지 않고, 허용목록(§2.1)에 있는지만 확인하는 단일 POST
+  캐치올로 처리. 모든 v1 허용 엔드포인트가 POST라서(라우터 확인됨)
+  메서드 분기 불필요.
+- **감사 로그는 아직 안 붙임**: DESIGN.md §15 파이프라인에 감사 로그
+  기록이 있지만, 마일스톤 계획(§16)상 M7에서 전체 경로(control-plane +
+  프록시)에 한 번에 배선하기로 했으므로 M5에서는 미룸.

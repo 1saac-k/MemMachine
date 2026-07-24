@@ -11,7 +11,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.types import ExceptionHandler
 
-from memmachine_account.server import routes_auth, routes_orgs, routes_tokens
+from memmachine_account.server import (
+    routes_auth,
+    routes_orgs,
+    routes_proxy,
+    routes_tokens,
+)
 from memmachine_account.server.config import AppConfig, load_config
 from memmachine_account.server.errors import AccountError
 from memmachine_account.server.storage import (
@@ -45,6 +50,7 @@ def create_app(config: AppConfig) -> FastAPI:
     app.include_router(routes_auth.router, prefix="/account/v1")
     app.include_router(routes_tokens.router, prefix="/account/v1")
     app.include_router(routes_orgs.router, prefix="/account/v1")
+    app.include_router(routes_proxy.router)
 
     return app
 
